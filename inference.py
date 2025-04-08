@@ -4,13 +4,18 @@ from hi_diffusers import HiDreamImagePipeline
 from hi_diffusers import HiDreamImageTransformer2DModel
 from hi_diffusers.schedulers.fm_solvers_unipc import FlowUniPCMultistepScheduler
 from hi_diffusers.schedulers.flash_flow_match import FlashFlowMatchEulerDiscreteScheduler
-from transformers import LlamaForCausalLM, PreTrainedTokenizerFast
+from transformers import LlamaForCausalLM, PreTrainedTokenizerFast, BitsAndBytesConfig
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_type", type=str, default="dev")
 args = parser.parse_args()
 model_type = args.model_type
 MODEL_PREFIX = "HiDream-ai"
 LLAMA_MODEL_NAME = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_compute_dtype="float16"
+)
 
 # Model configurations
 MODEL_CONFIGS = {
@@ -56,25 +61,26 @@ def load_models(model_type):
     
     tokenizer_4 = PreTrainedTokenizerFast.from_pretrained(
         LLAMA_MODEL_NAME,
+        quantization_config=bnb_config,
         use_fast=False)
     
     text_encoder_4 = LlamaForCausalLM.from_pretrained(
         LLAMA_MODEL_NAME,
         output_hidden_states=True,
         output_attentions=True,
-        torch_dtype=torch.bfloat16).to("cuda")
+        quantization_config=bnb_config).to("cuda")
 
     transformer = HiDreamImageTransformer2DModel.from_pretrained(
         pretrained_model_name_or_path, 
-        subfolder="transformer", 
-        torch_dtype=torch.bfloat16).to("cuda")
+        subfolder="transformer",
+        quantization_config=bnb_config).to("cuda")
 
     pipe = HiDreamImagePipeline.from_pretrained(
         pretrained_model_name_or_path, 
         scheduler=scheduler,
         tokenizer_4=tokenizer_4,
         text_encoder_4=text_encoder_4,
-        torch_dtype=torch.bfloat16
+        quantization_config=bnb_config,
     ).to("cuda", torch.bfloat16)
     pipe.transformer = transformer
     
