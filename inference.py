@@ -62,18 +62,24 @@ def load_models(model_type):
     tokenizer_4 = PreTrainedTokenizerFast.from_pretrained(
         LLAMA_MODEL_NAME,
         quantization_config=bnb_config,
+        device_map="auto",
         use_fast=False)
+    print("Tokenizer loaded successfully! GPU memory usage: ", torch.cuda.memory_allocated() / 1024**2, "MB")
     
     text_encoder_4 = LlamaForCausalLM.from_pretrained(
         LLAMA_MODEL_NAME,
         output_hidden_states=True,
         output_attentions=True,
-        quantization_config=bnb_config).to("cuda")
+        device_map="auto",
+        quantization_config=bnb_config)
+    print("Text encoder loaded successfully! GPU memory usage: ", torch.cuda.memory_allocated() / 1024**2, "MB")
 
     transformer = HiDreamImageTransformer2DModel.from_pretrained(
         pretrained_model_name_or_path, 
         subfolder="transformer",
-        quantization_config=bnb_config).to("cuda")
+        device_map="auto",
+        quantization_config=bnb_config)
+    print("Transformer loaded successfully! GPU memory usage: ", torch.cuda.memory_allocated() / 1024**2, "MB")
 
     pipe = HiDreamImagePipeline.from_pretrained(
         pretrained_model_name_or_path, 
@@ -81,7 +87,10 @@ def load_models(model_type):
         tokenizer_4=tokenizer_4,
         text_encoder_4=text_encoder_4,
         quantization_config=bnb_config,
-    ).to("cuda", torch.bfloat16)
+        device_map="auto",
+    )
+    print("Pipeline loaded successfully! GPU memory usage: ", torch.cuda.memory_allocated() / 1024**2, "MB")
+    
     pipe.transformer = transformer
     
     return pipe, config
@@ -106,6 +115,7 @@ def parse_resolution(resolution_str):
         return 1024, 1024  # Default fallback
 
 # Generate image function
+@torch.inference_mode()
 def generate_image(pipe, model_type, prompt, resolution, seed):
     # Get configuration for current model
     config = MODEL_CONFIGS[model_type]
